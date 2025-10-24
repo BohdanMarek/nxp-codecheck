@@ -1,0 +1,53 @@
+# This workflow will install Python dependencies, run tests and other codechecks on Codecheck project
+
+name: Python Continous Integration
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+permissions:
+  contents: read
+
+jobs:
+  codecheck:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.13"]
+
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    steps:
+    
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install uv and set up Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '${{ matrix.python-version }}'
+          activate-environment: "true"
+
+      - name: Install codecheck from PyPi
+        run: uv pip install nxp-codecheck
+
+      - name: Install Development Dependencies
+        run: |
+          pip install -r requirements_dev.txt
+
+      - name: Run Codecheck
+        run: |
+          # Ignoring the 'copyright' check as the year of merge to Github may differ from the actual year when the file was updated
+          # Ignoring the 'cspell' check as cspell may not be installed on gh actions runner
+          codecheck -s --output reports_codecheck --info-check copyright --info-check cspell
+
+      - name: Archive Results
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: Results-${{ matrix.python-version }}-${{ matrix.os }}
+          path: reports_codecheck
+        if: always() && job.status == 'failure'
